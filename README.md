@@ -40,6 +40,7 @@ Change .env file in the root directory:
    PORT=8000
    SECRET=ThisIsSecretKey
    ```
+
 4. **Run the Project**
 
    ```sh
