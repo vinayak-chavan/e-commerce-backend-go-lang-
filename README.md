@@ -20,9 +20,9 @@ This project is a basic e-commerce application built with Go, Gin, and GORM. It 
    ```
 2. **Install Dependencies**
 
-```sh
-go mod tidy
-```
+   ```sh
+   go mod tidy
+   ```
 
 3. **Set Up Environment Variables**
 
@@ -41,6 +41,6 @@ SECRET=ThisIsSecretKey
 
 4. **Run the Project**
 
-```sh
-go run main.go
-```
+   ```sh
+   go run main.go
+   ```
