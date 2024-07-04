@@ -28,17 +28,18 @@ This project is a basic e-commerce application built with Go, Gin, and GORM. It 
 
 Change .env file in the root directory:
 
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=your_db_user
-DB_PASS=your_db_password
-DB_NAME=your_db_name
-DB_PORT=5432
-DB_SSLMODE=disable
-DB_TIMEZONE=Asia/Kolkata
-PORT=8000
-SECRET=ThisIsSecretKey
-
+   ```sh
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_USER=your_db_user
+   DB_PASS=your_db_password
+   DB_NAME=your_db_name
+   DB_PORT=5432
+   DB_SSLMODE=disable
+   DB_TIMEZONE=Asia/Kolkata
+   PORT=8000
+   SECRET=ThisIsSecretKey
+   ```
 4. **Run the Project**
 
    ```sh
