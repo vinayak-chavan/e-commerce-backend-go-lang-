@@ -12,6 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
+
+	_ "e-commerce/docs"
+
+	swaggerfiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 var DB *gorm.DB
@@ -23,6 +28,17 @@ func init() {
 	}
 }
 
+// @title E-Commerce
+// @version 1.0
+// @description Testing Swagger APIs.
+// @securityDefinitions.apiKey JWT
+// @in header
+// @name Authorization
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+// @host localhost:8000
+// @BasePath /
+// @schemes http
 func main() {
 
 	db.InitDatabase()
@@ -40,7 +56,7 @@ func main() {
 
 	router.GET("/health-check", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"message": "Application working fine!!",
+			"message": "Application is working fine!!",
 		})
 	})
 
@@ -51,6 +67,8 @@ func main() {
 	routes.RegisterUserRoutes(router)
 	routes.RegisterCartRoutes(router)
 	routes.RegisterOrderRoutes(router)
+
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 
 	port := os.Getenv("PORT")
 	if port == "" {

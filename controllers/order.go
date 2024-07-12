@@ -5,12 +5,27 @@ import (
 	"time"
 
 	"e-commerce/db"
+	"e-commerce/dto"
 	"e-commerce/models"
 
 	"github.com/gin-gonic/gin"
 )
 
 // AddOrderFromCart creates an order from user's cart and stores it in Order and Inventory tables
+// @Summary Add an order from the cart
+// @Description Create an order from the user's cart
+// @Tags orders
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 201 {object} dto.OrderResponseDTO
+// @Failure 400 {object} dto.ErrorResponse
+// @Failure 500 {object} dto.ErrorResponse
+// @securityDefinitions.apiKey Authorization
+// @in header
+// @name Authorization
+// @Security JWT
+// @Router /orders [post]
 func AddOrderFromCart(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	userIDUint, _ := userID.(uint)
@@ -18,12 +33,12 @@ func AddOrderFromCart(c *gin.Context) {
 	// Check if the user's cart has items
 	var cartItems []models.Cart
 	if err := db.DB.Where("user_id = ?", userIDUint).Preload("Product").Find(&cartItems).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch cart items"})
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to fetch cart items"})
 		return
 	}
 
 	if len(cartItems) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cart is empty"})
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Cart is empty"})
 		return
 	}
 
@@ -48,7 +63,7 @@ func AddOrderFromCart(c *gin.Context) {
 	// Create the order in the database
 	if err := tx.Create(&order).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to create order"})
 		return
 	}
 
@@ -63,7 +78,7 @@ func AddOrderFromCart(c *gin.Context) {
 
 		if err := tx.Create(&inventory).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add inventory"})
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to add inventory"})
 			return
 		}
 	}
@@ -71,17 +86,22 @@ func AddOrderFromCart(c *gin.Context) {
 	// Clear user's cart after successful order creation
 	if err := tx.Where("user_id = ?", userIDUint).Delete(&models.Cart{}).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear cart"})
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to clear cart"})
 		return
 	}
 
 	// Commit transaction
 	tx.Commit()
 
-	// Remove user details from the response for security reasons
-	order.User = models.User{}
+	// Prepare the order response DTO
+	orderResponse := dto.OrderResponseDTO{
+		ID:          order.ID,
+		Bill:        order.Bill,
+		CurrentDate: order.CurrentDate,
+		Inventory:   mapToInventoryDTOs(order.Inventory),
+	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Order created successfully", "order": order})
+	c.JSON(http.StatusCreated, orderResponse)
 }
 
 // calculateTotalBill calculates the total bill from cart items
@@ -93,41 +113,72 @@ func calculateTotalBill(cartItems []models.Cart) float64 {
 	return total
 }
 
+// mapToInventoryDTOs maps inventory items to inventory response DTOs
+func mapToInventoryDTOs(inventoryItems []models.Inventory) []dto.InventoryResponseDTO {
+	var inventoryDTOs []dto.InventoryResponseDTO
+	for _, item := range inventoryItems {
+		inventoryDTOs = append(inventoryDTOs, dto.InventoryResponseDTO{
+			ID:       item.ID,
+			Name:     item.Name,
+			Price:    item.Price,
+			Quantity: item.Quantity,
+		})
+	}
+	return inventoryDTOs
+}
+
+// GetMyOrders retrieves the user's orders
+// @Summary Get my orders
+// @Description Retrieve the current user's orders
+// @Tags orders
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} dto.OrderResponseDTO
+// @Failure 500 {object} dto.ErrorResponse
+// @securityDefinitions.apiKey Authorization
+// @in header
+// @name Authorization
+// @Security JWT
+// @Router /orders [get]
 func GetMyOrders(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	userIDUint, _ := userID.(uint)
 
 	var orders []models.Order
 	if err := db.DB.Preload("Inventory").Where("user_id = ?", userIDUint).Find(&orders).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch orders"})
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to fetch orders"})
 		return
 	}
 
-	// Prepare a clean response without nested Order and User details
-	var cleanOrders []gin.H
+	// Prepare order response DTOs
+	var orderResponses []dto.OrderResponseDTO
 	for _, order := range orders {
-		var cleanInventory []gin.H
-		for _, inv := range order.Inventory {
-			cleanInventory = append(cleanInventory, gin.H{
-				"id":       inv.ID,
-				"name":     inv.Name,
-				"price":    inv.Price,
-				"quantity": inv.Quantity,
-			})
-		}
-
-		cleanOrders = append(cleanOrders, gin.H{
-			"id":          order.ID,
-			"bill":        order.Bill,
-			"currentDate": order.CurrentDate,
-			"inventory":   cleanInventory,
+		orderResponses = append(orderResponses, dto.OrderResponseDTO{
+			ID:          order.ID,
+			Bill:        order.Bill,
+			CurrentDate: order.CurrentDate,
+			Inventory:   mapToInventoryDTOs(order.Inventory),
 		})
 	}
 
-	c.JSON(http.StatusOK, cleanOrders)
+	c.JSON(http.StatusOK, orderResponses)
 }
 
 // GetAllOrders fetches all orders for admin role only
+// @Summary Get all orders
+// @Description Retrieve all orders (admin only)
+// @Tags orders
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {array} dto.OrderResponseDTO
+// @Failure 500 {object} dto.ErrorResponse
+// @securityDefinitions.apiKey Authorization
+// @in header
+// @name Authorization
+// @Security JWT
+// @Router /orders/all [get]
 func GetAllOrders(c *gin.Context) {
 	var orders []models.Order
 	if err := db.DB.Preload("User").Preload("Inventory").Find(&orders).Error; err != nil {
@@ -135,32 +186,16 @@ func GetAllOrders(c *gin.Context) {
 		return
 	}
 
-	// Prepare a clean response
-	var response []gin.H
+	// Prepare order response DTOs
+	var orderResponses []dto.OrderResponseDTO
 	for _, order := range orders {
-		var cleanInventory []gin.H
-		for _, inv := range order.Inventory {
-			cleanInventory = append(cleanInventory, gin.H{
-				"id":       inv.ID,
-				"name":     inv.Name,
-				"price":    inv.Price,
-				"quantity": inv.Quantity,
-			})
-		}
-
-		response = append(response, gin.H{
-			"id":          order.ID,
-			"bill":        order.Bill,
-			"currentDate": order.CurrentDate,
-			"user": gin.H{
-				"id":    order.UserId,
-				"name":  order.User.Name,
-				"email": order.User.Email,
-				// Add other user details as needed
-			},
-			"inventory": cleanInventory,
+		orderResponses = append(orderResponses, dto.OrderResponseDTO{
+			ID:          order.ID,
+			Bill:        order.Bill,
+			CurrentDate: order.CurrentDate,
+			Inventory:   mapToInventoryDTOs(order.Inventory),
 		})
 	}
 
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, orderResponses)
 }
