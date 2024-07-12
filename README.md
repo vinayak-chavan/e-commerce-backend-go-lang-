@@ -46,3 +46,20 @@ Change .env file in the root directory:
    ```sh
    go run main.go
    ```
+
+5. **For swagger documentation (Optional)**
+
+   ```sh
+   go install github.com/swaggo/swag/cmd/swag@latest
+   go get -u github.com/swaggo/gin-swagger
+   go get -u github.com/swaggo/files
+   ```
+6. **Generate the Swagger Documentation**
+
+   ```sh
+   swag init
+   ```
+
+7. **Access Swagger UI**
+
+Open your browser and navigate to http://localhost:8000/swagger/index.html to view the Swagger UI for your APIs.
